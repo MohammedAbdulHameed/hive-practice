@@ -1,0 +1,499 @@
+Hive Queries
+
+create database
+------------------
+create database niit;
+
+show all the databases in hive
+----------------------------------
+show databases;
+
+ Select a database
+--------------------
+use niit;
+
+Create transaction table
+-------------------------------
+create table txnrecords(txnno INT, txndate STRING, custno INT, amount DOUBLE, 
+category STRING, product STRING, city STRING, state STRING, spendby STRING)
+row format delimited
+fields terminated by ','
+stored as textfile;
+
+Create customer table
+-------------------------------
+create table customer(custno INT, firstname STRING, lastname STRING, age INT, profession STRING)
+row format delimited
+fields terminated by ','
+stored as textfile;
+ 
+ Load the data into the table (from local file system)
+-----------------------------------------------------
+LOAD DATA LOCAL INPATH '/home/hduser/txns1.txt' OVERWRITE INTO TABLE txnrecords;
+LOAD DATA LOCAL INPATH '/home/hduser/custs-' OVERWRITE INTO TABLE customer;
+
+ Describing metadata or schema of the table
+---------------------------------------------
+describe txnrecords;
+
+ Describing detailed metadata or schema of the table
+---------------------------------------------
+describe extended txnrecords;
+
+Counting no of records
+-------------------------
+select count(*) from txnrecords;
+
+Count of each profession in the Customers List
+---------------------------------------------------
+select profession, count(profession) as headcount from customer group by profession order by profession;
+
+PART A
+1. find the total number of customers  for each profession.
+Ans:
+select profession, count(profession) as headcount from customer group by profession order by profession desc limit 10;
+Writer	95
+Veterinarian	208
+Therapist	187
+Teacher	189
+Statistician	196
+Social worker	212
+Secretary	200
+Reporter	199
+Recreation and fitness worker	210
+Real estate agent	191
+
+2. find the total number of customers   who do have any profession;
+Ans:
+select  count(profession) as total count from customer;
+9999
+
+3. Find out total Ten buyers from the sales data along with their personal details.
+Ans:
+select a.custno, b.firstname,b.lastname, b.age, b.profession, sum(a.amount) as amt from txnrecords a, customer b where a.custno=b.custno group by a.custno, b.firstname, b.lastname, b.age, b.profession order by amt desc limit 10;
+4009485	Stuart	House	58	Teacher	1973.3
+4006425	Joe	Burns	30	Economist	1732.09
+4000221	Glenda	Boswell	28	Civil engineer	1671.4700000000003
+4003228	Elsie	Newton	54	Accountant	1640.63
+4006606	Jackie	Lewis	66	Recreation and fitness worker	1628.9399999999996
+4006467	Evelyn	Monroe	37	Financial analyst	1605.9499999999998
+4004927	Joan	Lowry	30	Librarian	1576.71
+4008321	Paul	Carey	64	Human resources assistant	1560.79
+4000815	Julie	Galloway	53	Actor	1557.8200000000002
+4001051	Arlene	Higgins	62	Police officer	1488.67
+
+4. find out total sales of each type with their respective percentage.
+Ans:
+hive> create table totalsale(total bigint) row format delimited fields terminated by ',' stored as textfile;
+hive> desc extended txnrecords;
+OK
+txnno               	int                 	                    
+txndate             	string              	                    
+custno              	int                 	                    
+amount              	double              	                    
+category            	string              	                    
+product             	string              	                    
+city                	string              	                    
+state               	string              	                    
+spendby             	string 
+hive> insert overwrite table totalsale select sum(amount) from txnrecords;
+hive> select * from  totalsale ;
+OK
+5110820
+hive>select a.spendby, round(sum(a.amount),2) as typesale, round ((sum(a.amount)/total*100),2) as salespercent from txnrecords a, totalsale b group by a.spendby , b.total;
+ cash	187685.61	3.67
+ credit	4923134.93	96.33
+
+PART B
+hive> create table NYSE1(exchangeName String, stock_symbol String, stock_date date, stock_price_open double, stock_price_high double, stock_price_low double, stock_price_close double, stock_volume bigint,  stock_price_adj_close double)row format delimited fields terminated by ',' stored as textfile;
+hive>LOAD DATA LOCAL INPATH '/home/hduser/NYSE.csv' OVERWRITE INTO TABLE NYSE1;
+hive>
+
+1. find total variance for each stock.
+Ans:
+ hive>select stock_symbol, round(((stock_price_high-stock_price_low)*100/stock_price_low),2) from NYSE1 limit 10;
+OK
+AEA	4.99
+AEA	7.58
+AEA	6.83
+AEA	4.22
+AEA	8.23
+AEA	5.13
+AEA	6.09
+AEA	8.52
+AEA	7.72
+AEA	7.69
+
+2. find total volume for each stock.
+hive>select stock_symbol, sum(stock_volume) from NYSE1 group by stock_symbol limit 10;
+AA	42061448400
+AAI	5246821400
+AAN	817567400
+AAP	2802701500
+AAR	49882000
+AAV	834246600
+AB	1125446300
+ABA	11686500
+ABB	4532301800
+ABD	469354400
+
+
+
+
+
+
+
+
+
+PART C
+
+create margin.jar file→ run the jar file → hadoop jar margin.jar /niit/RetailData /niit/margin_data-→store the output→ check the output → hadoop fs -cat /niit/margin_data/p*.
+
+ hive> create external table margin (prodno string, qty int, profit bigint, margin_pc double) row format delimited fields  terminated by ',' stored as textfile location '/niit/margin_data';
+
+hive>select * from margin;
+
+1.  Total net profit
+Ans:
+hive>select sum(profit) from margin;
+16163257
+
+2. find the percentage for those product who are having moretahn 10%.
+Ans:
+hive>create table grossprofit (ptotal bigint);
+hive>insert overwrite table grossprofit select sum(profit) from margin where profit >0;
+hive> select sum(a.profit) as total_profit,(sum(a.profit)*100/b.ptotal) as profit_pc from margin a, grossprofit b where a.margin_pc >10 group by b.ptotal;
+14899667	89.56923688430594
+
+3. find the total volume of business(qty)  for those product whose margin morethan 10%
+Ans:
+hive>select prodno,qty from margin where margin_pc >10 limit 10;
+0002884011363	1
+0008635012177	167
+0008635099680	30
+0010742201412	27
+0010742201610	30
+0010742201719	17
+0010742201818	21
+0010742202112	3
+0010742202211	28
+0010742206615	35
+
+
+4. Find the gross Profit.
+hive>select sum(profit) from margin where profit >0; 
+16634804
+
+5.find gross loss.
+Ans:---
+hive> select sum(profit*-1) from margin where profit <0;
+471547
+6. find(gross loss/gross profit*100) % should be as less as possible.
+hive>create table grossprofit (profittotal bigint);           (already created )
+hive> insert overwrite table grossprofit select sum(profit) from margin where profit >0;
+hive>create table grossloss (ltotal bigint);
+hive>insert overwrite table grossloss select sum(profit) from margin where profit <0;
+hive>select (b.ltotal*100/a.ptotal) as loss_pc from grossprofit a,grossloss b;
+-2.834701268497062
+
+
+OLYMPIC ANALYSIS
+
+* create new database Olympic
+hive>create database olympic;
+hive> use olympic;
+
+* create table
+hive>create table olympic (athelete STRING,age INT,country STRING,year STRING,closing STRING,sport STRING,gold INT,silver INT,bronze INT,total INT) row format delimited fields terminated by '\t' stored as textfile;
+*load the data 
+hive>LOAD DATA LOCAL INPATH '/home/hduser/olympic_data.csv' OVERWRITE INTO TABLE olympic;
+hive> select * from olympic limit 10;
+OK
+Michael Phelps	23	United States	2008	08-24-08	Swimming	80	0	8
+Michael Phelps	19	United States	2004	08-29-04	Swimming	60	2	8
+Michael Phelps	27	United States	2012	08-12-12	Swimming	42	0	6
+Natalie Coughlin	25	United States	2008	08-24-08	Swimming1	2	3	6
+Aleksey Nemov	24	Russia	2000	10-01-00	Gymnastics	2	13	6
+Alicia Coutts	24	Australia	2012	08-12-12	Swimming	13	1	5
+Missy Franklin	17	United States	2012	08-12-12	Swimming	40	1	5
+Ryan Lochte	27	United States	2012	08-12-12	Swimming	22	1	5
+Allison Schmitt	22	United States	2012	08-12-12	Swimming	31	1	5
+Natalie Coughlin	21	United States	2004	08-29-04	Swimming2	2	1	5
+Time taken: 0.092 seconds, Fetched: 10 row(s)
+hive> 
+
+
+
+
+
+Queries
+1. Using the dataset list the total number of medals won by each country in swimming.?
+Ans:
+hive>select country,sport,sum(total) as medals from olympic where sport='Swimming' group by country,sport order by medals desc;
+United States	Swimming	267
+Australia	Swimming	163
+Netherlands	Swimming	46
+Japan	Swimming	43
+France	Swimming	39
+China	Swimming	35
+Germany	Swimming	32
+Russia	Swimming	20
+Italy	Swimming	16
+South Africa	Swimming	11
+Great Britain	Swimming	11
+Hungary	Swimming	9
+Sweden	Swimming	9
+Brazil	Swimming	8
+Ukraine	Swimming	7
+Zimbabwe	Swimming	7
+Romania	Swimming	6
+Canada	Swimming	5
+South Korea	Swimming	4
+Poland	Swimming	3
+Tunisia	Swimming	3
+Spain	Swimming	3
+Austria	Swimming	3
+Norway	Swimming	2
+Slovakia	Swimming	2
+Belarus	Swimming	2
+Costa Rica	Swimming	2
+Lithuania	Swimming	1
+Trinidad and Tobago	Swimming	1
+Slovenia	Swimming	1
+Serbia	Swimming	1
+Denmark	Swimming	1
+Croatia	Swimming	1
+Argentina	Swimming	1
+Time taken: 56.993 seconds, Fetched: 34 row(s)
+hive> 
+
+2. Display real life number of medals India won year wise.
+Ans:
+hive>select country,year,sum(total) from olympic where country='India' group by country,year;
+India	2000	1
+India	2004	1
+India	2008	3
+India	2012	6
+3. Find the total number of medals each country won display the name along with total medals.
+Ans:
+hive> select country,sum(total) as medal from olympic group by country limit 10;
+Afghanistan	2
+Algeria	8
+Argentina	141
+Armenia	10
+Australia	609
+Austria	91
+Azerbaijan	25
+Bahamas	24
+Bahrain	1
+Barbados	1
+
+4. Find the real life number of gold medals each country won.
+Ans:
+hive>select country,sum(gold) as gold_medal from olympic group by country limit 10;
+Afghanistan	0
+Algeria	2
+Argentina	49
+Armenia	0
+Australia	163
+Austria	36
+Azerbaijan	6
+Bahamas	11
+Bahrain	0
+Barbados	0
+5. Which country got medals for Shooting, year wise classification.
+Ans:
+hive> create table out1 (country string,year string,sport string,total_medal int) row format delimited fields terminated by ',' stored as textfile;
+OK
+Time taken: 0.075 seconds
+hive> desc out1;
+OK
+country             	string              	                    
+year                	string              	                    
+sport               	string              	                    
+total_medal         	int                 	                    
+Time taken: 0.089 seconds, Fetched: 4 row(s)
+hive> insert overwrite table out1 select country,year,sport ,total from olympic where sport='Shooting' group by country,year,sport,total;
+
+hive> select * from out1 limit 10;
+OK
+Australia	2000	Shooting	1
+Australia	2004	Shooting	1
+Australia	2008	Shooting	1
+Austria	2004	Shooting	1
+Azerbaijan	2000	Shooting	1
+Azerbaijan	2004	Shooting	1
+Belarus	2000	Shooting	1
+Belarus	2000	Shooting	2
+Belarus	2004	Shooting	1
+Belarus	2012	Shooting	1
+Time taken: 0.051 seconds, Fetched: 10 row(s)
+hive> 
+
+YEAR 2000
+Ans:
+hive>select year,country,total_medal from out1 where year='2000'group by year,country,total_medal limit 10;
+2000	Australia	1
+2000	Azerbaijan	1
+2000	Belarus	1
+2000	Belarus	2
+2000	Bulgaria	1
+2000	China	1
+2000	China	2
+2000	Czech Republic	1
+2000	Denmark	1
+2000	Finland	1
+Time taken: 26.998 seconds, Fetched: 10 row(s)
+hive> 
+
+YEAR 2004
+Ans:
+hive> select year,country,total_medal from out1 where year='2004'group by year,country,total_medal limit 10;
+Total MapReduce CPU Time Spent: 3 seconds 370 msec
+OK
+2004	Australia	1
+2004	Austria	1
+2004	Azerbaijan	1
+2004	Belarus	1
+2004	Bulgaria	2
+2004	China	1
+2004	Cuba	1
+2004	Czech Republic	1
+2004	Finland	1
+2004	Germany	1
+Time taken: 26.008 seconds, Fetched: 10 row(s)
+hive> 
+
+YEAR 2008
+Ans:
+hive> select year,country,total_medal from out1 where year='2008'group by year,country,total_medal limit 10;
+2008	Australia	1
+2008	China	1
+2008	Croatia	1
+2008	Cuba	1
+2008	Czech Republic	1
+2008	Czech Republic	2
+2008	Finland	1
+2008	France	1
+2008	Georgia	1
+2008	Germany	1
+Time taken: 25.458 seconds, Fetched: 10 row(s)
+
+
+YEAR 2012
+Ans:
+hive> select year,country,total_medal from out1 where year='2012'group by year,country,total_medal limit 10;
+2012	Belarus	1
+2012	Belgium	1
+2012	China	1
+2012	Croatia	1
+2012	Cuba	1
+2012	Czech Republic	1
+2012	Denmark	1
+2012	France	1
+2012	Great Britain	1
+2012	India	1
+Time taken: 26.386 seconds, Fetched: 10 row(s)
+hive> 
+
+
+PETROL ANALYSIS
+
+*create database
+hive> create database petrol;
+OK
+Time taken: 0.035 seconds
+hive> use petrol;
+OK
+Time taken: 0.018 seconds
+hive
+
+*create table
+
+hive>
+ create table petrol (distributer_id STRING, distributer_name STRING, amt_IN STRING, amy_OUT STRING, vol_IN INT, vol_OUT INT, year INT)  row format delimited fields terminated by ',' stored as textfile;
+OK
+Time taken: 0.117 seconds
+hive> 
+
+* Loading the data
+hive> LOAD DATA LOCAL INPATH '/home/hduser/petrol_data.txt' OVERWRITE INTO TABLE petrol;
+Loading data to table petrol.petrol
+Table petrol.petrol stats: [numFiles=1, numRows=0, totalSize=18681, rawDataSize=0]
+OK
+Time taken: 0.292 seconds
+* creating new table
+hive>create table petrol1 (distributer_id STRING,distributer_name STRING,amt_IN INT,amt_OUT INT,vol_IN INT,vol_OUT INT,year INT) row format delimited fields terminated by ',' stored as textfile;
+hive>insert overwrite table petrol1 select distributer_id,distributer_name,regexp_replace(amt_IN,"\\$",""),regexp_replace(amy_OUT,"\\$",""),vol_IN,vol_OUT,year from petrol;
+
+
+Queries
+1. In real life what is the total amount of petrol in volume sold by every distributor.
+Ans:
+hive>select distributer_id,distributer_name,sum(vol_out) as total from petrol group by distributer_id,distributer_name limit 10;
+A0I 5Q8	reliance	818
+A0M 0G6	Bharat	691
+A0P 2M4	Bharat	662
+A0V 7Q3	Bharat	880
+A0X 9H9	hindustan	625
+A2M 7X9	hindustan	858
+A2S 5V8	shell	849
+A2W 5W2	reliance	764
+A4U 9B2	hindustan	731
+A5Q 3H2	Bharat	870
+2. Which are the top 10 distributors ID’s for selling petrol and also display the amount of petrol sold in volume by them individually
+Ans:
+hive>select distributer_id,distributer_name,sum(vol_out) as total from petrol group by distributer_id,distributer_name order by total desc limit 10;
+OK
+T1A 9W4	reliance	899
+S8W 0P4	reliance	899
+V8U 2T6	shell	898
+O9P 9S3	reliance	897
+O8A 6Z5	Bharat	897
+F6W 6H3	shell	896
+M6S 1P4	Bharat	895
+N5Q 8E5	Bharat	895
+J4M 4G3	shell	895
+E6O 9P1	Bharat	895
+Time taken: 59.018 seconds, Fetched: 10 row(s)
+hive> 
+
+3. Find real life 10 distributor name who sold petrol in the least amount.
+Hive> select distributer_id,distributer_name,sum(vol_out) as total from petrol group by distributer_id,distributer_name order by total limit 10;
+F4D 6K2	Bharat	602
+H7M 4M4	Bharat	603
+G9F 6U7	hindustan	607
+R3W 2E3	shell	608
+O5D 2R6	hindustan	610
+H4P 6A9	Bharat	610
+V0Z 0F6	reliance	612
+O0D 0L1	shell	612
+W0M 8R7	shell	612
+L9H 1K6	hindustan	613
+Time taken: 58.101 seconds, Fetched: 10 row(s)
+hive> 
+
+4.The constraint to this query is the difference between volumeIN and volumeOuT is illegal in real life if greater than 500. As we see all distributors are receiving patrols on every next cycle.
+
+List all distributors who have this difference, along with the year and the difference which they have in that year.
+Hint: (vol_IN-vol_OUT)>500
+Ans:
+hive> select distributer_id,distributer_name,year,(vol_in-vol_out) as diff from petrol group by distributer_id,(vol_in-vol_out),distributer_name,year order by diff desc limit 10 ;
+
+E6U 0I2	hindustan	1646	483
+R3W 2E3	shell	1767	480
+I2N 7S1	shell	1935	478
+A7Z 3L9	shell	1795	474
+V8S 4P6	Bharat	1732	464
+C0G 8G1	shell	1843	460
+C9B 3Q8	reliance	1782	457
+M1J 2H6	shell	1693	455
+T4L 8D0	reliance	2000	452
+J7Z 9V4	shell	1748	446
+
+There is no such a  distributors who is having  difference >500
+
+hive>select distributer_id,distributer_name,year,(vol_in-vol_out) from petrol where (vol_in-vol_out)>500 group by distributer_id,(vol_in-vol_out),distributer_name,year order by year desc ;
+Total MapReduce CPU Time Spent: 5 seconds 600 msec
+OK
+Time taken: 56.169 seconds
